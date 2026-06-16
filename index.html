@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f1020" />
+    <link rel="icon" type="image/svg+xml" href="/tetris/favicon.svg" />
+    <title>Tetris — Rust + WebAssembly</title>
+    <script type="module" crossorigin src="/tetris/assets/index-CGQoj7s0.js"></script>
+    <link rel="stylesheet" crossorigin href="/tetris/assets/index-C0s26G7J.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <img class="logo" src="/tetris/logo.svg" alt="Tetris" />
+        <div class="topbar-actions">
+          <button id="help-btn" class="chip" aria-label="How to play">？ Help</button>
+          <button id="pause-btn" class="chip">Pause</button>
+        </div>
+      </header>
+
+      <main class="playarea">
+        <aside class="side side-left">
+          <div class="panel">
+            <span class="label">Hold</span>
+            <canvas id="hold" width="96" height="96"></canvas>
+          </div>
+          <div class="panel stats">
+            <div><span class="label">Score</span><b id="score">0</b></div>
+            <div><span class="label">Lines</span><b id="lines">0</b></div>
+            <div><span class="label">Level</span><b id="level">1</b></div>
+          </div>
+        </aside>
+
+        <div class="board-wrap">
+          <canvas id="board"></canvas>
+          <div id="overlay" class="overlay hidden">
+            <div class="overlay-card">
+              <p id="overlay-title">Game Over</p>
+              <button id="restart-btn" class="chip primary">Play again</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="side side-right">
+          <div class="panel">
+            <span class="label">Next</span>
+            <canvas id="next" width="96" height="288"></canvas>
+          </div>
+        </aside>
+      </main>
+
+      <!-- On-screen controls (default on touch devices) -->
+      <nav id="touch-controls" class="touch-controls hidden">
+        <div class="pad-left">
+          <button class="tbtn" data-action="MoveLeft" aria-label="Left">◀</button>
+          <button class="tbtn" data-action="SoftDrop" aria-label="Down">▼</button>
+          <button class="tbtn" data-action="MoveRight" aria-label="Right">▶</button>
+        </div>
+        <div class="pad-right">
+          <button class="tbtn" data-action="RotateCCW" aria-label="Rotate left">↺</button>
+          <button class="tbtn" data-action="RotateCW" aria-label="Rotate right">↻</button>
+          <button class="tbtn" data-action="Hold" aria-label="Hold">⇄</button>
+          <button class="tbtn wide" data-action="HardDrop" aria-label="Hard drop">DROP</button>
+        </div>
+      </nav>
+
+      <!-- User guide / help overlay -->
+      <div id="help" class="overlay hidden">
+        <div class="overlay-card help-card">
+          <button id="help-close" class="chip help-close" aria-label="Close">✕</button>
+          <h2>How to play</h2>
+          <p class="help-lead">
+            Stack the falling tetrominoes to fill complete horizontal lines. Full
+            lines clear and score points. Clear four at once (a <b>Tetris</b>) or
+            pull off a <b>T-spin</b> for big bonuses. The game ends when the stack
+            reaches the top.
+          </p>
+
+          <h3>Desktop controls</h3>
+          <table class="help-keys">
+            <tr><td>← →&nbsp; / &nbsp;A D</td><td>Move left / right</td></tr>
+            <tr><td>↓&nbsp; / &nbsp;S</td><td>Soft drop</td></tr>
+            <tr><td>Space</td><td>Hard drop</td></tr>
+            <tr><td>↑&nbsp; / &nbsp;X</td><td>Rotate clockwise</td></tr>
+            <tr><td>Z&nbsp; / &nbsp;Ctrl</td><td>Rotate counter-clockwise</td></tr>
+            <tr><td>C&nbsp; / &nbsp;Shift</td><td>Hold piece</td></tr>
+            <tr><td>P&nbsp; / &nbsp;Esc</td><td>Pause</td></tr>
+          </table>
+
+          <h3>On phones</h3>
+          <p class="help-lead">
+            On-screen buttons appear automatically: a D-pad on the left to move and
+            soft-drop, and rotate / hold / <b>DROP</b> buttons on the right.
+          </p>
+
+          <h3>Tips</h3>
+          <ul class="help-tips">
+            <li>The faint outline shows where the piece will land (<b>ghost</b>).</li>
+            <li>Use <b>Hold</b> to stash a piece for later — once per drop.</li>
+            <li>Back-to-back Tetrises and T-spins keep a <b>+50%</b> bonus going.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>
