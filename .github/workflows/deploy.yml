@@ -1,0 +1,50 @@
+name: Deploy
+
+# Builds the WASM + web bundle and publishes it to the `gh-pages` branch.
+# Configure Pages once under Settings → Pages → "Deploy from a branch" → gh-pages / root.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build wasm
+        run: wasm-pack build --target web --out-dir ../web/src/wasm-pkg
+        working-directory: wasm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build web
+        run: npm ci && npm run build
+        working-directory: web
+
+      # Stop GitHub Pages from running the output through Jekyll.
+      - name: Disable Jekyll
+        run: touch web/dist/.nojekyll
+
+      - name: Deploy to gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: web/dist
+          clean: true

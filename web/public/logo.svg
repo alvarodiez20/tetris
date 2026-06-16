@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 56" role="img" aria-label="Tetris logo">
+  <!-- Icon mark: a stack of tetromino blocks -->
+  <g>
+    <rect x="2"  y="2"  width="16" height="16" rx="2.5" fill="#22d3ee"/>
+    <rect x="20" y="2"  width="16" height="16" rx="2.5" fill="#a855f7"/>
+    <rect x="20" y="20" width="16" height="16" rx="2.5" fill="#fbbf24"/>
+    <rect x="20" y="38" width="16" height="16" rx="2.5" fill="#22c55e"/>
+    <rect x="38" y="38" width="16" height="16" rx="2.5" fill="#ef4444"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="70" y="38"
+        font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="30" font-weight="800" letter-spacing="6" fill="#e7e8f0">TETRIS</text>
+</svg>

@@ -1,0 +1,19 @@
+[package]
+name = "tetris-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "WebAssembly bindings for tetris-core"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tetris-core = { path = "../core" }
+wasm-bindgen = "0.2"
+
+[dependencies.web-sys]
+version = "0.3"
+features = []

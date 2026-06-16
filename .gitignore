@@ -1,0 +1,20 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock
+
+# WASM build output
+/web/src/wasm-pkg
+
+# Node / web
+node_modules
+/web/dist
+/web/.vite
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
