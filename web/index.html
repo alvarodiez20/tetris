@@ -15,23 +15,34 @@
       <header class="topbar">
         <img class="logo" src="/logo.svg" alt="Tetris" />
         <div class="topbar-actions">
+          <label class="ai-control">
+            <span class="ai-label">AI</span>
+            <select id="ai-mode" aria-label="AI player mode">
+              <option value="off">Off</option>
+              <option value="smart">Smart</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
+          <label class="ai-control ai-speed-control">
+            <span class="ai-label">Speed</span>
+            <input id="ai-speed" type="range" min="1" max="20" value="9" aria-label="AI speed" />
+          </label>
           <button id="help-btn" class="chip" aria-label="How to play">？ Help</button>
           <button id="pause-btn" class="chip">Pause</button>
         </div>
       </header>
 
       <main class="playarea">
-        <aside class="side side-left">
-          <div class="panel">
-            <span class="label">Hold</span>
-            <canvas id="hold" width="96" height="96"></canvas>
-          </div>
-          <div class="panel stats">
-            <div><span class="label">Score</span><b id="score">0</b></div>
-            <div><span class="label">Lines</span><b id="lines">0</b></div>
-            <div><span class="label">Level</span><b id="level">1</b></div>
-          </div>
-        </aside>
+        <section class="panel panel-hold">
+          <span class="label">Hold</span>
+          <canvas id="hold"></canvas>
+        </section>
+
+        <section class="panel panel-stats">
+          <div><span class="label">Score</span><b id="score">0</b></div>
+          <div><span class="label">Lines</span><b id="lines">0</b></div>
+          <div><span class="label">Level</span><b id="level">1</b></div>
+        </section>
 
         <div class="board-wrap">
           <canvas id="board"></canvas>
@@ -43,12 +54,10 @@
           </div>
         </div>
 
-        <aside class="side side-right">
-          <div class="panel">
-            <span class="label">Next</span>
-            <canvas id="next" width="96" height="288"></canvas>
-          </div>
-        </aside>
+        <section class="panel panel-next">
+          <span class="label">Next</span>
+          <canvas id="next"></canvas>
+        </section>
       </main>
 
       <!-- On-screen controls (default on touch devices) -->

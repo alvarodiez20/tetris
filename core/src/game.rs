@@ -268,6 +268,61 @@ impl Game {
         self.soft_dropping = on;
     }
 
+    // --- AI bot ------------------------------------------------------------
+
+    /// Compute a sequence of [`Action`]s that places the current piece in the
+    /// spot the heuristic likes best. Considers a single Hold (swapping in the
+    /// held piece, or the next piece if Hold is empty). The plan ends with a
+    /// hard drop; replan after the piece locks.
+    pub fn bot_plan(&mut self) -> Vec<Action> {
+        if self.done {
+            return Vec::new();
+        }
+
+        let current = crate::bot::best_placement(&self.board, self.active.kind);
+
+        // What Hold would give us this turn.
+        let hold_kind = self.hold.unwrap_or_else(|| self.bag.preview(1)[0]);
+        let held = if self.can_hold {
+            crate::bot::best_placement(&self.board, hold_kind)
+        } else {
+            None
+        };
+
+        let use_hold = match (current, held) {
+            (Some(c), Some(h)) => h.score > c.score,
+            (None, Some(_)) => true,
+            _ => false,
+        };
+        let chosen = if use_hold { held } else { current };
+
+        let Some(p) = chosen else {
+            // Board is full to the top; just drop and let it end.
+            return vec![Action::HardDrop];
+        };
+
+        let mut actions = Vec::new();
+        if use_hold {
+            actions.push(Action::Hold);
+        }
+        // Rotations happen in the open spawn area, so the box origin stays at
+        // SPAWN_X and a plain horizontal shift reaches the target column.
+        for _ in 0..p.rotation {
+            actions.push(Action::RotateCW);
+        }
+        let shift = p.x - SPAWN_X;
+        let step = if shift < 0 {
+            Action::MoveLeft
+        } else {
+            Action::MoveRight
+        };
+        for _ in 0..shift.unsigned_abs() {
+            actions.push(step);
+        }
+        actions.push(Action::HardDrop);
+        actions
+    }
+
     // --- internals ---------------------------------------------------------
 
     fn abs_cells(kind: Kind, rot: Rotation, x: i32, y: i32) -> [(i32, i32); 4] {
@@ -477,6 +532,23 @@ mod tests {
         }
         assert_eq!(a.score(), b.score());
         assert_eq!(a.visible_board(), b.visible_board());
+    }
+
+    #[test]
+    fn bot_survives_and_clears_lines() {
+        let mut g = Game::new(42);
+        let mut pieces = 0;
+        while !g.is_done() && pieces < 150 {
+            let plan = g.bot_plan();
+            assert!(!plan.is_empty());
+            for act in plan {
+                g.input(act);
+            }
+            pieces += 1;
+        }
+        // A competent heuristic should clear plenty of lines and not top out fast.
+        assert!(!g.is_done(), "bot topped out within 150 pieces");
+        assert!(g.lines() > 10, "bot cleared too few lines: {}", g.lines());
     }
 
     #[test]

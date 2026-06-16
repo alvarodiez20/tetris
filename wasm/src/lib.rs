@@ -94,6 +94,13 @@ impl WasmGame {
         self.inner.preview(n).iter().map(|k| *k as u8).collect()
     }
 
+    /// AI: the action sequence (0..=6 codes) the heuristic bot would play for the
+    /// current piece. Ends with a hard drop; call again after the piece locks.
+    #[wasm_bindgen(js_name = botPlan)]
+    pub fn bot_plan(&mut self) -> Vec<u8> {
+        self.inner.bot_plan().iter().map(|a| *a as u8).collect()
+    }
+
     pub fn score(&self) -> u32 {
         self.inner.score()
     }

@@ -5,6 +5,7 @@ A modern-guideline Tetris implementation featuring:
 - **Pure Rust core engine** — deterministic and seedable (SRS rotation, 7-bag, hold, ghost, lock delay, T-spins, back-to-back/combo scoring)
 - **WebAssembly build** for browser gameplay
 - **Responsive Canvas web UI** that works on desktop (keyboard) and mobile (on-screen buttons)
+- **AI player** — a heuristic "Smart" bot (El-Tetris evaluation) plus a "Random" bot, watchable at adjustable speed
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -134,6 +135,22 @@ game.is_done();
 The engine is **deterministic**: the same `seed` + the same sequence of inputs
 and `dt` values always reproduces the same game — handy for replays and any
 future RL work (a placement-based `step` API can be layered on `core`).
+
+## 🤖 AI player
+
+The top bar has an **AI** selector (`Off` / `Smart` / `Random`) and a speed slider.
+
+- **Smart** — a heuristic bot in the Rust core. For each piece it enumerates every
+  rotation × column placement (plus a one-piece Hold), scores the resulting board
+  with the [El-Tetris](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/)
+  feature set (landing height, lines cleared, row/column transitions, holes,
+  wells), and plays the best one. It keeps a flat, hole-free stack and clears
+  lines indefinitely.
+- **Random** — drops pieces with random rotation and position; useful as a baseline.
+
+The bot is exposed from the core as `Game::bot_plan()` (and `WasmGame.botPlan()`),
+returning the action sequence to reach its chosen placement — so it reuses the
+exact same rules the human plays by.
 
 ## 🌐 Deploy to GitHub Pages
 

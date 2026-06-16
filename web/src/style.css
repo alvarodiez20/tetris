@@ -48,7 +48,34 @@ body {
 
 .topbar-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ai-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ai-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+#ai-mode {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.85rem;
+}
+#ai-speed {
+  width: 84px;
+  accent-color: var(--accent);
 }
 
 .chip {
@@ -66,21 +93,23 @@ body {
   color: #fff;
 }
 
+/* Desktop: Hold + Score stacked at left, board centered (full height), Next at
+   right. The board column flexes; panels sit in their own tracks so nothing
+   overlaps the playfield. */
 .playarea {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
   min-height: 0;
-  padding: 0.5rem;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 0.75rem;
-  width: 112px;
+  padding: 0.5rem;
+  align-items: start;
+  justify-content: center;
+  grid-template-columns: 120px minmax(0, 1fr) 120px;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "hold  board next"
+    "stats board next"
+    ".     board .";
 }
 
 .panel {
@@ -92,6 +121,20 @@ body {
   align-items: center;
   gap: 0.4rem;
 }
+.panel canvas {
+  display: block;
+}
+.panel-hold {
+  grid-area: hold;
+}
+.panel-stats {
+  grid-area: stats;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+.panel-next {
+  grid-area: next;
+}
 
 .label {
   font-size: 0.7rem;
@@ -100,24 +143,21 @@ body {
   color: var(--muted);
 }
 
-.stats {
-  align-items: stretch;
-  gap: 0.6rem;
-}
-.stats div {
+.panel-stats div {
   display: flex;
   flex-direction: column;
 }
-.stats b {
+.panel-stats b {
   font-size: 1.3rem;
   font-variant-numeric: tabular-nums;
 }
 
 .board-wrap {
+  grid-area: board;
   position: relative;
-  flex: 0 1 auto;
+  min-height: 0;
+  min-width: 0;
   height: 100%;
-  aspect-ratio: 10 / 20;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -245,23 +285,47 @@ body {
   letter-spacing: 0.15em;
 }
 
-/* Phone portrait: stack side panels above the board, controls at the bottom. */
+/* Phone portrait: a compact HUD row (Hold · Score/Lines/Level · Next) above the
+   board, the board filling the remaining height, controls pinned at the bottom. */
 @media (max-width: 640px) {
-  .playarea {
-    flex-direction: column;
+  .topbar {
+    padding: 0.5rem 0.75rem;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
-  .side {
-    flex-direction: row;
-    width: auto;
-    justify-content: center;
+  .topbar h1,
+  .topbar .logo {
+    height: 26px;
+  }
+
+  .playarea {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "hold stats next"
+      "board board board";
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem;
   }
   .panel {
     flex-direction: row;
+    align-items: center;
+    padding: 0.4rem 0.5rem;
+    gap: 0.45rem;
+  }
+  .panel-hold .label,
+  .panel-next .label {
+    display: none; /* the thumbnail is self-explanatory; save width */
+  }
+  .panel-stats {
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .panel-stats b {
+    font-size: 1.1rem;
   }
   .board-wrap {
-    height: auto;
-    width: 100%;
-    max-height: 60dvh;
+    height: 100%;
   }
 }

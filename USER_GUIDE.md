@@ -47,6 +47,18 @@ On touch devices, on-screen controls appear automatically:
 - **Left pad** — ◀ ▼ ▶ to move and soft-drop.
 - **Right pad** — ↺ ↻ to rotate, ⇄ to hold, and **DROP** for a hard drop.
 
+## Watch the AI play
+
+The **AI** selector in the top bar lets a bot take over:
+
+- **Smart** — a heuristic AI that evaluates every possible placement and keeps the
+  stack low and flat, clearing lines continuously.
+- **Random** — drops pieces at random; a fun (bad) baseline to compare against.
+
+Use the **Speed** slider to control how fast the bot plays. Set the selector back
+to **Off** to take control yourself. (While the AI is active, your move/rotate
+inputs are ignored, but you can still **Pause**.)
+
 ## Key mechanics
 
 - **Ghost piece** — a faint outline shows exactly where the current piece will

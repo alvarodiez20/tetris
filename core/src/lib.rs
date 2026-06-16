@@ -17,6 +17,7 @@
 
 mod bag;
 mod board;
+mod bot;
 mod game;
 mod piece;
 mod rng;

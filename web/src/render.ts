@@ -1,10 +1,12 @@
 // Canvas rendering. The playfield is a fixed 10x20 grid; everything scales from
-// the cell size, which we recompute on resize for crisp output at any DPI.
+// the cell size, which we recompute on resize for crisp output at any DPI. The
+// Hold/Next thumbnails switch to a compact horizontal layout on small screens.
 
 import type { WasmGame } from "./wasm-pkg/tetris_wasm";
 
 export const COLS = 10;
 export const ROWS = 20;
+const NEXT_COUNT = 3;
 
 // Indexed by cell id (kind + 1): 0 empty, then I J L O S T Z.
 const COLORS = [
@@ -36,26 +38,35 @@ export class Renderer {
   private cell = 24;
   private dpr = Math.max(1, window.devicePixelRatio || 1);
 
+  private compact = false;
+  private holdBox = 88;
+  private nextMini = 80;
+
   constructor(board: HTMLCanvasElement, hold: HTMLCanvasElement, next: HTMLCanvasElement) {
     this.board = board;
     this.hold = hold;
     this.next = next;
   }
 
-  /** Recompute the cell size to fit the available CSS box, then size buffers. */
+  /** Recompute sizes to fit the available CSS boxes, then size the buffers. */
   resize(): void {
     this.dpr = Math.max(1, window.devicePixelRatio || 1);
-    const wrap = this.board.parentElement!;
-    const availW = wrap.clientWidth;
-    const availH = wrap.clientHeight;
-    this.cell = Math.floor(Math.min(availW / COLS, availH / ROWS));
-    this.cell = Math.max(8, this.cell);
+    this.compact = window.matchMedia("(max-width: 640px)").matches;
 
-    const w = this.cell * COLS;
-    const h = this.cell * ROWS;
-    sizeCanvas(this.board, w, h, this.dpr);
-    sizeCanvas(this.hold, 96, 96, this.dpr);
-    sizeCanvas(this.next, 96, 96 * 3, this.dpr);
+    // Playfield: largest cell that fits its wrapper.
+    const wrap = this.board.parentElement!;
+    this.cell = Math.max(8, Math.floor(Math.min(wrap.clientWidth / COLS, wrap.clientHeight / ROWS)));
+    sizeCanvas(this.board, this.cell * COLS, this.cell * ROWS, this.dpr);
+
+    // Hold + Next thumbnails.
+    this.holdBox = this.compact ? 50 : 88;
+    this.nextMini = this.compact ? 46 : 80;
+    sizeCanvas(this.hold, this.holdBox, this.holdBox, this.dpr);
+    if (this.compact) {
+      sizeCanvas(this.next, this.nextMini * NEXT_COUNT, this.nextMini, this.dpr);
+    } else {
+      sizeCanvas(this.next, this.nextMini, this.nextMini * NEXT_COUNT, this.dpr);
+    }
   }
 
   draw(game: WasmGame): void {
@@ -88,22 +99,21 @@ export class Renderer {
 
     // Ghost piece.
     const ghost = game.ghostCells();
+    const color = COLORS[game.activeKind() + 1];
     for (let i = 0; i < ghost.length; i += 2) {
-      const x = ghost[i];
       const y = ghost[i + 1];
       if (y < 0) continue;
       ctx.globalAlpha = 0.25;
-      this.cellRect(ctx, x, y, COLORS[game.activeKind() + 1]);
+      this.cellRect(ctx, ghost[i], y, color);
       ctx.globalAlpha = 1;
     }
 
     // Active piece.
     const active = game.activeCells();
     for (let i = 0; i < active.length; i += 2) {
-      const x = active[i];
       const y = active[i + 1];
       if (y < 0) continue;
-      this.cellRect(ctx, x, y, COLORS[game.activeKind() + 1]);
+      this.cellRect(ctx, active[i], y, color);
     }
     ctx.restore();
   }
@@ -120,33 +130,42 @@ export class Renderer {
     const ctx = this.hold.getContext("2d")!;
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
-    ctx.clearRect(0, 0, 96, 96);
+    ctx.clearRect(0, 0, this.holdBox, this.holdBox);
     const kind = game.hold();
-    if (kind >= 0) drawThumb(ctx, kind, 0, 96);
+    if (kind >= 0) drawThumb(ctx, kind, 0, 0, this.holdBox);
     ctx.restore();
   }
 
   private drawNext(game: WasmGame): void {
     const ctx = this.next.getContext("2d")!;
+    const m = this.nextMini;
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
-    ctx.clearRect(0, 0, 96, 288);
-    const upcoming = game.preview(3);
+    ctx.clearRect(0, 0, this.compact ? m * NEXT_COUNT : m, this.compact ? m : m * NEXT_COUNT);
+    const upcoming = game.preview(NEXT_COUNT);
     for (let i = 0; i < upcoming.length; i++) {
-      drawThumb(ctx, upcoming[i], i * 96, 96);
+      const ox = this.compact ? i * m : 0;
+      const oy = this.compact ? 0 : i * m;
+      drawThumb(ctx, upcoming[i], ox, oy, m);
     }
     ctx.restore();
   }
 }
 
-function drawThumb(ctx: CanvasRenderingContext2D, kind: number, offsetY: number, box: number): void {
+function drawThumb(
+  ctx: CanvasRenderingContext2D,
+  kind: number,
+  ox: number,
+  oy: number,
+  box: number,
+): void {
   const shape = THUMBS[kind];
   if (!shape) return;
   const cell = box / 5;
   const pad = (box - cell * 4) / 2;
+  ctx.fillStyle = COLORS[kind + 1];
   for (const [x, y] of shape) {
-    ctx.fillStyle = COLORS[kind + 1];
-    ctx.fillRect(pad + x * cell + 1, offsetY + pad + y * cell + 1, cell - 2, cell - 2);
+    ctx.fillRect(ox + pad + x * cell + 1, oy + pad + y * cell + 1, cell - 2, cell - 2);
   }
 }
 
