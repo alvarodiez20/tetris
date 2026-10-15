@@ -6,6 +6,8 @@ pub const VISIBLE_HEIGHT: usize = 20;
 /// Hidden rows above the visible field (pieces spawn here).
 pub const BUFFER_HEIGHT: usize = 20;
 pub const HEIGHT: usize = VISIBLE_HEIGHT + BUFFER_HEIGHT; // 40
+/// Cell id used for garbage blocks (pieces use 1..=7).
+pub const GARBAGE_ID: u8 = 8;
 
 #[derive(Clone)]
 pub struct Board {
@@ -71,6 +73,21 @@ impl Board {
         cleared
     }
 
+    /// Push `n` garbage rows in from the bottom: every existing row moves up by
+    /// `n`, and the new rows are solid except for one hole at `hole_x`.
+    /// Returns `true` if the stack was pushed past the top of the board.
+    pub fn push_garbage(&mut self, n: usize, hole_x: usize) -> bool {
+        let n = n.min(HEIGHT);
+        let overflow = self.cells[..n * WIDTH].iter().any(|&c| c != 0);
+        self.cells.copy_within(n * WIDTH.., 0);
+        for row in HEIGHT - n..HEIGHT {
+            for x in 0..WIDTH {
+                self.cells[row * WIDTH + x] = if x == hole_x { 0 } else { GARBAGE_ID };
+            }
+        }
+        overflow
+    }
+
     /// Raw view of all cells (including buffer), row-major.
     pub fn cells(&self) -> &[u8; WIDTH * HEIGHT] {
         &self.cells
@@ -99,6 +116,28 @@ mod tests {
         let cleared = b.clear_lines();
         assert_eq!(cleared, 1);
         assert_eq!(b.get(0, y), 2, "block above should fall into cleared row");
+    }
+
+    #[test]
+    fn garbage_rows_have_one_hole_and_shift_stack_up() {
+        let mut b = Board::default();
+        let last = HEIGHT as i32 - 1;
+        b.set(0, last, 3);
+        assert!(!b.push_garbage(2, 4));
+        assert_eq!(b.get(0, last - 2), 3, "existing block moves up by 2");
+        for y in [last, last - 1] {
+            for x in 0..WIDTH as i32 {
+                let expect = if x == 4 { 0 } else { GARBAGE_ID };
+                assert_eq!(b.get(x, y), expect);
+            }
+        }
+    }
+
+    #[test]
+    fn garbage_reports_overflow_at_the_top() {
+        let mut b = Board::default();
+        b.set(5, 0, 1);
+        assert!(b.push_garbage(1, 0));
     }
 
     #[test]

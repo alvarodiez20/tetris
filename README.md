@@ -6,6 +6,7 @@ A modern-guideline Tetris implementation featuring:
 - **WebAssembly build** for browser gameplay
 - **Responsive Canvas web UI** that works on desktop (keyboard) and mobile (on-screen buttons)
 - **AI player** — a heuristic "Smart" bot (El-Tetris evaluation) plus a "Random" bot, watchable at adjustable speed
+- **Online 2-player Versus** — race a friend on another computer: same pieces, live view of each other's board, and garbage lines for every clear (peer-to-peer over WebRTC, no game server)
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -45,6 +46,7 @@ A modern-guideline Tetris implementation featuring:
 │       ├── main.ts         # Game loop, wiring
 │       ├── render.ts       # Responsive Canvas renderer
 │       ├── input.ts        # Keyboard + on-screen button backends
+│       ├── net.ts          # Versus transport: PeerJS/WebRTC link + message validation
 │       └── style.css
 └── .github/workflows/
     ├── ci.yml              # fmt + clippy + tests + web build
@@ -130,11 +132,46 @@ game.active_cells();                   // [(x, y); 4]
 game.ghost_cells();
 game.score(); game.lines(); game.level();
 game.is_done();
+// versus:
+game.receive_garbage(2);               // queue garbage sent by an opponent
+game.pending_garbage();                // lines waiting to rise
+// StepResult { garbage_sent, garbage_received, .. } from input()/tick()
 ```
 
 The engine is **deterministic**: the same `seed` + the same sequence of inputs
 and `dt` values always reproduces the same game — handy for replays and any
 future RL work (a placement-based `step` API can be layered on `core`).
+
+## ⚔️ Online versus
+
+Tap **⚔ Versus** to host a room (you get a 5-letter code and an invite link) or
+join one. See the [User Guide](./USER_GUIDE.md#play-online-versus) for the rules.
+
+**How it works**
+
+- Both players run the *same deterministic engine* locally, so controls never wait
+  on the network. The host picks a random seed; both get the identical 7-bag
+  sequence.
+- Each client streams a small snapshot of its field (board, active piece, score —
+  ~300 bytes, at most 20×/s, only when it changes) to the other, which draws it
+  read-only. Garbage and "I topped out" are separate messages.
+- The engine owns the rules: `Game::receive_garbage`, `pending_garbage`, and
+  `StepResult::{garbage_sent, garbage_received}`. Clears are worth 0/1/2/4 garbage
+  (T-spins 2/4/6, back-to-back +1, combo up to +4). Outgoing garbage first cancels
+  incoming; leftover rises after the next lock that clears nothing. Hole columns come
+  from a seeded RNG, so they're reproducible.
+- Transport is [PeerJS](https://peerjs.com/): the public PeerJS cloud server only
+  brokers the WebRTC handshake, after which the browsers talk directly. That keeps
+  the site fully static on GitHub Pages. Everything received from the peer is
+  validated before use (`parseMsg` in `net.ts`).
+
+**Limits.** The game is client-authoritative — fine for friends, not for a public
+ladder (that would need a server that replays `seed + inputs`). There is no TURN
+relay, so peers behind symmetric NATs / strict firewalls may fail to connect.
+
+**Self-hosting the signalling server.** Run [`peerjs-server`](https://github.com/peers/peerjs-server)
+and open the site with `?peerHost=HOST&peerPort=9000&peerPath=/&peerSecure=1`
+(`peerDebug=1..3` enables PeerJS logging).
 
 ## 🤖 AI player
 

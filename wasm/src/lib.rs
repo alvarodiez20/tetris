@@ -9,12 +9,14 @@
 //! const cells = game.visibleBoard();   // Uint8Array, 200 cells (10x20)
 //! ```
 
-use tetris_core::{Action, Game};
+use tetris_core::{Action, Game, StepResult};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct WasmGame {
     inner: Game,
+    /// Garbage earned since the last [`WasmGame::take_garbage_sent`] call.
+    outbox: u32,
 }
 
 fn action_from_u8(a: u8) -> Option<Action> {
@@ -36,24 +38,49 @@ impl WasmGame {
     pub fn new(seed: u64) -> WasmGame {
         WasmGame {
             inner: Game::new(seed),
+            outbox: 0,
         }
     }
 
     pub fn reset(&mut self, seed: u64) {
         self.inner.reset(seed);
+        self.outbox = 0;
     }
 
     /// Apply a discrete action (0..=6). Returns lines cleared (only > 0 on hard drop).
     pub fn input(&mut self, action: u8) -> u32 {
         match action_from_u8(action) {
-            Some(a) => self.inner.input(a).lines_cleared,
+            Some(a) => {
+                let r = self.inner.input(a);
+                self.collect(&r)
+            }
             None => 0,
         }
     }
 
     /// Advance time by `dt_ms`. Returns lines cleared this tick.
     pub fn tick(&mut self, dt_ms: f64) -> u32 {
-        self.inner.tick(dt_ms).lines_cleared
+        let r = self.inner.tick(dt_ms);
+        self.collect(&r)
+    }
+
+    /// Versus: garbage lines earned (net of cancelled garbage) since the last
+    /// call. Send this to the opponent, then it resets to zero.
+    #[wasm_bindgen(js_name = takeGarbageSent)]
+    pub fn take_garbage_sent(&mut self) -> u32 {
+        std::mem::take(&mut self.outbox)
+    }
+
+    /// Versus: queue garbage lines received from the opponent.
+    #[wasm_bindgen(js_name = receiveGarbage)]
+    pub fn receive_garbage(&mut self, n: u32) {
+        self.inner.receive_garbage(n);
+    }
+
+    /// Versus: garbage lines queued but not yet risen onto the board.
+    #[wasm_bindgen(js_name = pendingGarbage)]
+    pub fn pending_garbage(&self) -> u32 {
+        self.inner.pending_garbage()
     }
 
     #[wasm_bindgen(js_name = setSoftDrop)]
@@ -113,6 +140,14 @@ impl WasmGame {
     #[wasm_bindgen(js_name = isDone)]
     pub fn is_done(&self) -> bool {
         self.inner.is_done()
+    }
+}
+
+impl WasmGame {
+    /// Record outgoing garbage from a step and return its lines cleared.
+    fn collect(&mut self, r: &StepResult) -> u32 {
+        self.outbox += r.garbage_sent;
+        r.lines_cleared
     }
 }
 

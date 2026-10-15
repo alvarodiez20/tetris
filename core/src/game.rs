@@ -7,12 +7,16 @@
 use crate::bag::Bag;
 use crate::board::{Board, BUFFER_HEIGHT, WIDTH};
 use crate::piece::{cells, kicks, Kind, Rotation};
+use crate::rng::Rng;
 
 const SPAWN_X: i32 = 3;
 const SPAWN_Y: i32 = (BUFFER_HEIGHT as i32) - 2; // box top-left, so piece straddles the buffer/visible line
 const LOCK_DELAY_MS: f64 = 500.0;
 const MAX_LOCK_RESETS: u32 = 15;
 const SOFT_DROP_FACTOR: f64 = 20.0; // soft drop is 20x gravity
+const MAX_PENDING_GARBAGE: u32 = 20; // incoming garbage is capped at one screen
+const MAX_GARBAGE_PER_LOCK: u32 = 8; // rows that can rise after a single lock
+const GARBAGE_SEED_SALT: u64 = 0xD1B5_4A32_D192_ED03;
 
 /// Discrete player inputs. Applied immediately by [`Game::input`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +38,10 @@ pub struct StepResult {
     pub score_delta: u32,
     pub locked: bool,
     pub done: bool,
+    /// Garbage lines to send to the opponent (already net of cancelled garbage).
+    pub garbage_sent: u32,
+    /// Garbage rows that rose into this player's board on this lock.
+    pub garbage_received: u32,
 }
 
 struct Active {
@@ -56,6 +64,10 @@ pub struct Game {
     combo: i32,
     back_to_back: bool,
     done: bool,
+
+    // Versus mode: garbage waiting to rise, and the RNG choosing its holes.
+    pending_garbage: u32,
+    garbage_rng: Rng,
 
     // Timing / lock state.
     gravity_accum_ms: f64,
@@ -87,6 +99,8 @@ impl Game {
             combo: -1,
             back_to_back: false,
             done: false,
+            pending_garbage: 0,
+            garbage_rng: Rng::new(seed ^ GARBAGE_SEED_SALT),
             gravity_accum_ms: 0.0,
             soft_dropping: false,
             on_ground: false,
@@ -118,6 +132,11 @@ impl Game {
     }
     pub fn level(&self) -> u32 {
         self.level
+    }
+    /// Garbage lines queued by the opponent that will rise after the next lock
+    /// that does not clear a line.
+    pub fn pending_garbage(&self) -> u32 {
+        self.pending_garbage
     }
     pub fn hold_piece(&self) -> Option<Kind> {
         self.hold
@@ -266,6 +285,11 @@ impl Game {
 
     pub fn set_soft_drop(&mut self, on: bool) {
         self.soft_dropping = on;
+    }
+
+    /// Queue `n` garbage lines sent by an opponent (versus mode).
+    pub fn receive_garbage(&mut self, n: u32) {
+        self.pending_garbage = (self.pending_garbage + n).min(MAX_PENDING_GARBAGE);
     }
 
     // --- AI bot ------------------------------------------------------------
@@ -430,6 +454,7 @@ impl Game {
             (false, 4) => 800,
             _ => 0,
         };
+        let b2b_before = self.back_to_back;
         let mut gain = base * self.level;
         if difficult && self.back_to_back && base > 0 {
             gain += gain / 2; // back-to-back: +50%
@@ -447,6 +472,31 @@ impl Game {
         }
         self.score += gain;
 
+        // Versus: outgoing attack first cancels incoming garbage; if nothing was
+        // cleared, whatever is still pending rises from the bottom.
+        let mut garbage_sent = if cleared > 0 {
+            attack_lines(
+                cleared,
+                t_spin,
+                difficult && base > 0 && b2b_before,
+                self.combo,
+            )
+        } else {
+            0
+        };
+        let cancelled = garbage_sent.min(self.pending_garbage);
+        garbage_sent -= cancelled;
+        self.pending_garbage -= cancelled;
+        let mut garbage_received = 0;
+        if cleared == 0 && self.pending_garbage > 0 {
+            garbage_received = self.pending_garbage.min(MAX_GARBAGE_PER_LOCK);
+            self.pending_garbage -= garbage_received;
+            let hole = self.garbage_rng.below(WIDTH);
+            if self.board.push_garbage(garbage_received as usize, hole) {
+                self.done = true;
+            }
+        }
+
         // Next piece.
         self.can_hold = true;
         let next = self.bag.next();
@@ -457,6 +507,8 @@ impl Game {
             score_delta: self.score - score_before,
             locked: true,
             done: self.done,
+            garbage_sent,
+            garbage_received,
         }
     }
 
@@ -482,6 +534,25 @@ impl Game {
         let secs = (0.8 - l * 0.007).powf(l);
         (secs * 1000.0).max(1.0)
     }
+}
+
+/// Garbage lines an attack is worth (guideline-style table): singles send
+/// nothing, T-spins hit harder, back-to-back adds one, and long combos add more.
+fn attack_lines(cleared: u32, t_spin: bool, back_to_back: bool, combo: i32) -> u32 {
+    let base = match (t_spin, cleared) {
+        (true, n) => n * 2,
+        (false, 2) => 1,
+        (false, 3) => 2,
+        (false, 4) => 4,
+        _ => 0,
+    };
+    let b2b = u32::from(back_to_back);
+    let combo_bonus = if combo >= 2 {
+        (combo as u32 / 2).min(4)
+    } else {
+        0
+    };
+    base + b2b + combo_bonus
 }
 
 impl Game {
@@ -549,6 +620,109 @@ mod tests {
         // A competent heuristic should clear plenty of lines and not top out fast.
         assert!(!g.is_done(), "bot topped out within 150 pieces");
         assert!(g.lines() > 10, "bot cleared too few lines: {}", g.lines());
+    }
+
+    /// Bottom two rows full except columns 4..=5, with an O piece ready to drop
+    /// into the gap: a guaranteed double (worth 1 garbage line).
+    fn double_setup() -> Game {
+        let mut g = Game::new(1);
+        let last = crate::board::HEIGHT as i32 - 1;
+        for y in [last, last - 1] {
+            for x in (0..WIDTH as i32).filter(|x| *x != 4 && *x != 5) {
+                g.board.set(x, y, 1);
+            }
+        }
+        g.active = Active {
+            kind: Kind::O,
+            rot: Rotation::SPAWN,
+            x: 3,
+            y: SPAWN_Y,
+        };
+        g
+    }
+
+    #[test]
+    fn attack_table() {
+        assert_eq!(attack_lines(1, false, false, 0), 0);
+        assert_eq!(attack_lines(2, false, false, 1), 1);
+        assert_eq!(attack_lines(3, false, false, 1), 2);
+        assert_eq!(attack_lines(4, false, false, 1), 4);
+        assert_eq!(attack_lines(4, false, true, 1), 5, "back-to-back adds one");
+        assert_eq!(attack_lines(2, true, false, 1), 4, "t-spin double");
+        assert_eq!(attack_lines(1, false, false, 4), 2, "combo bonus");
+        assert_eq!(
+            attack_lines(1, false, false, 99),
+            4,
+            "combo bonus is capped"
+        );
+    }
+
+    #[test]
+    fn clearing_lines_sends_garbage() {
+        let mut g = double_setup();
+        let r = g.input(Action::HardDrop);
+        assert_eq!(r.lines_cleared, 2);
+        assert_eq!(r.garbage_sent, 1);
+    }
+
+    #[test]
+    fn clearing_lines_cancels_incoming_garbage_first() {
+        let mut g = double_setup();
+        g.receive_garbage(3);
+        let r = g.input(Action::HardDrop);
+        assert_eq!(r.garbage_sent, 0, "the attack was spent cancelling");
+        assert_eq!(r.garbage_received, 0, "no garbage rises on a clearing lock");
+        assert_eq!(g.pending_garbage(), 2);
+    }
+
+    #[test]
+    fn garbage_rises_after_a_non_clearing_lock() {
+        let mut g = Game::new(5);
+        g.receive_garbage(3);
+        assert_eq!(g.pending_garbage(), 3);
+        let r = g.input(Action::HardDrop);
+        assert_eq!(r.lines_cleared, 0);
+        assert_eq!(r.garbage_received, 3);
+        assert_eq!(g.pending_garbage(), 0);
+        let board = g.visible_board();
+        for row in 17..20 {
+            let garbage = board[row * WIDTH..(row + 1) * WIDTH]
+                .iter()
+                .filter(|&&c| c == crate::board::GARBAGE_ID)
+                .count();
+            assert_eq!(garbage, WIDTH - 1, "row {row} has exactly one hole");
+        }
+    }
+
+    #[test]
+    fn garbage_holes_are_deterministic_per_seed() {
+        let play = |seed| {
+            let mut g = Game::new(seed);
+            g.receive_garbage(2);
+            g.input(Action::HardDrop);
+            g.visible_board()
+        };
+        assert_eq!(play(9), play(9));
+    }
+
+    #[test]
+    fn pending_garbage_is_capped() {
+        let mut g = Game::new(1);
+        g.receive_garbage(500);
+        assert_eq!(g.pending_garbage(), MAX_PENDING_GARBAGE);
+    }
+
+    #[test]
+    fn garbage_can_top_the_player_out() {
+        let mut g = Game::new(2);
+        for _ in 0..40 {
+            if g.is_done() {
+                break;
+            }
+            g.receive_garbage(8);
+            g.input(Action::HardDrop);
+        }
+        assert!(g.is_done(), "a wall of garbage should end the game");
     }
 
     #[test]

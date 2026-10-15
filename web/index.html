@@ -27,6 +27,7 @@
             <span class="ai-label">Speed</span>
             <input id="ai-speed" type="range" min="1" max="20" value="9" aria-label="AI speed" />
           </label>
+          <button id="versus-btn" class="chip">⚔ Versus</button>
           <button id="help-btn" class="chip" aria-label="How to play">？ Help</button>
           <button id="pause-btn" class="chip">Pause</button>
         </div>
@@ -46,13 +47,25 @@
 
         <div class="board-wrap">
           <canvas id="board"></canvas>
+          <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
           <div id="overlay" class="overlay hidden">
             <div class="overlay-card">
               <p id="overlay-title">Game Over</p>
+              <p id="overlay-sub" class="overlay-sub hidden"></p>
               <button id="restart-btn" class="chip primary">Play again</button>
+              <button id="leave-btn" class="chip hidden">Leave match</button>
             </div>
           </div>
         </div>
+
+        <section class="panel panel-opp hidden" id="opp-panel">
+          <span class="label">Opponent</span>
+          <div class="opp-wrap"><canvas id="opp-board"></canvas></div>
+          <div class="opp-stats">
+            <span><i>Score</i> <b id="opp-score">0</b></span>
+            <span><i>Lines</i> <b id="opp-lines">0</b></span>
+          </div>
+        </section>
 
         <section class="panel panel-next">
           <span class="label">Next</span>
@@ -74,6 +87,46 @@
           <button class="tbtn wide" data-action="HardDrop" aria-label="Hard drop">DROP</button>
         </div>
       </nav>
+
+      <!-- Online versus lobby -->
+      <div id="versus" class="overlay hidden">
+        <div class="overlay-card help-card versus-card">
+          <button id="versus-close" class="chip help-close" aria-label="Close">✕</button>
+          <h2>Play online</h2>
+          <p class="help-lead">
+            Race a friend on another computer: same pieces, and every line you clear
+            sends garbage to their board.
+          </p>
+
+          <h3>Host a game</h3>
+          <div id="host-idle">
+            <button id="host-btn" class="chip primary">Create game</button>
+          </div>
+          <div id="host-room" class="hidden">
+            <p class="room-hint">Share this code with your opponent:</p>
+            <div id="room-code" class="room-code"></div>
+            <button id="copy-link-btn" class="chip">Copy invite link</button>
+          </div>
+
+          <h3>Join a game</h3>
+          <form id="join-form" class="join-form">
+            <input
+              id="join-code"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="5"
+              placeholder="CODE"
+              aria-label="Room code"
+            />
+            <button id="join-btn" class="chip primary" type="submit">Join</button>
+          </form>
+
+          <p id="versus-status" class="versus-status" role="status"></p>
+        </div>
+      </div>
 
       <!-- User guide / help overlay -->
       <div id="help" class="overlay hidden">
@@ -102,6 +155,14 @@
           <p class="help-lead">
             On-screen buttons appear automatically: a D-pad on the left to move and
             soft-drop, and rotate / hold / <b>DROP</b> buttons on the right.
+          </p>
+
+          <h3>Versus mode</h3>
+          <p class="help-lead">
+            Tap <b>⚔ Versus</b> to host a room or join one with a 5-letter code (or an
+            invite link). Both players get the same pieces. Clear 2+ lines at once to
+            send garbage; the <b>red bar</b> beside a board shows garbage about to rise
+            (clearing lines cancels it first). Last one standing wins.
           </p>
 
           <h3>Tips</h3>
