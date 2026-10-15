@@ -59,6 +59,40 @@ Use the **Speed** slider to control how fast the bot plays. Set the selector bac
 to **Off** to take control yourself. (While the AI is active, your move/rotate
 inputs are ignored, but you can still **Pause**.)
 
+## Play online (Versus)
+
+Tap **⚔ Versus** in the top bar to race a friend on another computer or phone.
+
+1. One player picks **Create game** and gets a 5-letter code (or **Copy invite
+   link** — opening the link joins automatically).
+2. The other player types the code under **Join a game**.
+3. After a 3-2-1 countdown both boards start with **the same sequence of pieces**.
+   Each player sees the opponent's board next to theirs, live.
+
+**Attacks.** Lines you clear send garbage (gray rows with one gap) to your
+opponent:
+
+| Clear | Garbage sent |
+| ----- | ------------ |
+| Single | 0 |
+| Double | 1 |
+| Triple | 2 |
+| Tetris | 4 |
+| T-spin single / double / triple | 2 / 4 / 6 |
+
+Back-to-back adds **+1**, and long combos add up to **+4**. Incoming garbage waits
+as a **red bar** on the edge of your board; clearing lines **cancels it first**.
+Whatever is left rises from the bottom after your next piece locks without clearing
+a line (at most 8 rows at a time).
+
+**Winning.** The last player still alive wins. After a match, both players can hit
+**Rematch** for a new game with a fresh piece sequence. Versus matches can't be
+paused, and the AI is disabled.
+
+> Online play connects the two browsers directly (WebRTC). A restrictive network —
+> some corporate or university Wi-Fi — may block it; try another network or a phone
+> hotspot.
+
 ## Key mechanics
 
 - **Ghost piece** — a faint outline shows exactly where the current piece will

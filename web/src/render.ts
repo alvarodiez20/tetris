@@ -3,6 +3,7 @@
 // Hold/Next thumbnails switch to a compact horizontal layout on small screens.
 
 import type { WasmGame } from "./wasm-pkg/tetris_wasm";
+import type { Snapshot } from "./net";
 
 export const COLS = 10;
 export const ROWS = 20;
@@ -18,7 +19,9 @@ const COLORS = [
   "#22c55e", // S green
   "#a855f7", // T purple
   "#ef4444", // Z red
+  "#6b7280", // 8 garbage gray
 ];
+const PENDING_COLOR = "#ef4444";
 
 // 4x4 spawn shapes for hold/next thumbnails (just the visual, kind-indexed).
 const THUMBS: Record<number, [number, number][]> = {
@@ -76,54 +79,13 @@ export class Renderer {
   }
 
   private drawBoard(game: WasmGame): void {
-    const ctx = this.board.getContext("2d")!;
-    const c = this.cell;
-    ctx.save();
-    ctx.scale(this.dpr, this.dpr);
-    ctx.clearRect(0, 0, c * COLS, c * ROWS);
-
-    // Grid background.
-    ctx.fillStyle = COLORS[0];
-    ctx.fillRect(0, 0, c * COLS, c * ROWS);
-    ctx.strokeStyle = "rgba(255,255,255,0.04)";
-    for (let x = 1; x < COLS; x++) line(ctx, x * c, 0, x * c, ROWS * c);
-    for (let y = 1; y < ROWS; y++) line(ctx, 0, y * c, COLS * c, y * c);
-
-    // Locked cells.
-    const cells = game.visibleBoard();
-    for (let i = 0; i < cells.length; i++) {
-      const id = cells[i];
-      if (id === 0) continue;
-      this.cellRect(ctx, i % COLS, Math.floor(i / COLS), COLORS[id]);
-    }
-
-    // Ghost piece.
-    const ghost = game.ghostCells();
-    const color = COLORS[game.activeKind() + 1];
-    for (let i = 0; i < ghost.length; i += 2) {
-      const y = ghost[i + 1];
-      if (y < 0) continue;
-      ctx.globalAlpha = 0.25;
-      this.cellRect(ctx, ghost[i], y, color);
-      ctx.globalAlpha = 1;
-    }
-
-    // Active piece.
-    const active = game.activeCells();
-    for (let i = 0; i < active.length; i += 2) {
-      const y = active[i + 1];
-      if (y < 0) continue;
-      this.cellRect(ctx, active[i], y, color);
-    }
-    ctx.restore();
-  }
-
-  private cellRect(ctx: CanvasRenderingContext2D, x: number, y: number, color: string): void {
-    const c = this.cell;
-    ctx.fillStyle = color;
-    ctx.fillRect(x * c + 1, y * c + 1, c - 2, c - 2);
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.fillRect(x * c + 1, y * c + 1, c - 2, Math.max(2, c * 0.16));
+    paintField(this.board, this.cell, this.dpr, {
+      cells: game.visibleBoard(),
+      ghost: game.ghostCells(),
+      active: game.activeCells(),
+      kind: game.activeKind(),
+      pending: game.pendingGarbage(),
+    });
   }
 
   private drawHold(game: WasmGame): void {
@@ -149,6 +111,98 @@ export class Renderer {
       drawThumb(ctx, upcoming[i], ox, oy, m);
     }
     ctx.restore();
+  }
+}
+
+/** Everything needed to paint one playfield, from a local game or a remote snapshot. */
+export interface FieldState {
+  cells: ArrayLike<number>;
+  ghost?: ArrayLike<number>;
+  active: ArrayLike<number>;
+  kind: number;
+  /** Garbage lines waiting to rise (drawn as a red bar on the left edge). */
+  pending: number;
+}
+
+function paintField(
+  canvas: HTMLCanvasElement,
+  c: number,
+  dpr: number,
+  f: FieldState,
+): void {
+  const ctx = canvas.getContext("2d")!;
+  const cellRect = (x: number, y: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * c + 1, y * c + 1, c - 2, c - 2);
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(x * c + 1, y * c + 1, c - 2, Math.max(2, c * 0.16));
+  };
+
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, c * COLS, c * ROWS);
+
+  // Grid background.
+  ctx.fillStyle = COLORS[0];
+  ctx.fillRect(0, 0, c * COLS, c * ROWS);
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
+  for (let x = 1; x < COLS; x++) line(ctx, x * c, 0, x * c, ROWS * c);
+  for (let y = 1; y < ROWS; y++) line(ctx, 0, y * c, COLS * c, y * c);
+
+  // Locked cells.
+  for (let i = 0; i < f.cells.length; i++) {
+    const id = f.cells[i];
+    if (id !== 0) cellRect(i % COLS, Math.floor(i / COLS), COLORS[id]);
+  }
+
+  const color = COLORS[f.kind + 1];
+
+  // Ghost piece.
+  if (f.ghost) {
+    ctx.globalAlpha = 0.25;
+    for (let i = 0; i < f.ghost.length; i += 2) {
+      if (f.ghost[i + 1] >= 0) cellRect(f.ghost[i], f.ghost[i + 1], color);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Active piece.
+  for (let i = 0; i < f.active.length; i += 2) {
+    if (f.active[i + 1] >= 0) cellRect(f.active[i], f.active[i + 1], color);
+  }
+
+  // Incoming garbage meter.
+  if (f.pending > 0) {
+    const h = Math.min(f.pending, ROWS) * c;
+    ctx.fillStyle = PENDING_COLOR;
+    ctx.fillRect(0, ROWS * c - h, Math.max(3, c * 0.22), h);
+  }
+  ctx.restore();
+}
+
+/** Read-only view of the opponent's field, drawn from network snapshots. */
+export class OpponentRenderer {
+  private cell = 12;
+  private dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  constructor(private canvas: HTMLCanvasElement) {}
+
+  resize(): void {
+    this.dpr = Math.max(1, window.devicePixelRatio || 1);
+    const wrap = this.canvas.parentElement!;
+    this.cell = Math.max(4, Math.floor(Math.min(wrap.clientWidth / COLS, wrap.clientHeight / ROWS)));
+    sizeCanvas(this.canvas, this.cell * COLS, this.cell * ROWS, this.dpr);
+  }
+
+  draw(snap: Snapshot | null): void {
+    const cells = new Uint8Array(COLS * ROWS);
+    if (snap) for (let i = 0; i < cells.length; i++) cells[i] = snap.b.charCodeAt(i) - 48;
+    paintField(this.canvas, this.cell, this.dpr, {
+      cells,
+      active: snap?.a ?? [],
+      kind: snap?.k ?? 0,
+      pending: snap?.p ?? 0,
+    });
   }
 }
 
